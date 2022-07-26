@@ -1,5 +1,3 @@
-//#include <SoftwareSerial.h>
-//SoftwareSerial mySerial(2, 3);//Rx,Tx
 
 void master_write(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t );
 uint16_t generate_CRC_16_bit_for_6BYTE(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t );
@@ -8,8 +6,6 @@ void configure_master();
 
 void setup() {
   Serial.begin(9600);
-  /*mySerial.begin(9600);
-    pinMode(4, OUTPUT);*/
   configure_master();
 }
 

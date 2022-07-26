@@ -49,12 +49,12 @@ void master_write(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_
   mySerial.write(B_3);//REGISTER ADDRESS
   mySerial.write(B_4);//REGISTER VALUE
   mySerial.write(B_5);//REGISTER VALUE
-  mySerial.write(CRC % 256); //CRC
-  mySerial.write(CRC >> 8); //CRC
+  mySerial.write(CRC_LEAST); //CRC
+  mySerial.write(CRC_SIGNIFICANT); //CRC
   digitalWrite(OUT_ENABLE_PIN, LOW);
 
   delay(WAIT_RESPONSE_TIME_ms);
-  
+
   dataPackageReceived.B_0 = mySerial.read();
   dataPackageReceived.B_1 = mySerial.read();
   dataPackageReceived.B_2 = mySerial.read();
@@ -65,14 +65,8 @@ void master_write(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_
   dataPackageReceived.CRC_SIGNIFICANT = mySerial.read();
 
   while (mySerial.available())Serial.println(mySerial.read());
-
-  boolean condition_for_succes1 = (dataPackageReceived.B_1 == 3 || dataPackageReceived.B_1 == 4 || dataPackageReceived.B_1 == 6) ;
-  boolean condition_for_succes2 = dataPackageReceived.CRC_LEAST == dataPackageSent.CRC_LEAST && dataPackageReceived.CRC_SIGNIFICANT == dataPackageSent.CRC_SIGNIFICANT  ;
-  if (condition_for_succes1 && condition_for_succes2) {
-    Serial.println("Succes");
-  } else {
-    Serial.println("Error");
-  }
+  /! slave'in cevabına ne olacağını kodla.
+  
 
 
 }
@@ -87,18 +81,13 @@ uint16_t generate_CRC_16_bit_for_6BYTE(uint8_t B_0, uint8_t B_1, uint8_t B_2, ui
   remainder = CRC_16_bit_for_1BYTE(B_4, remainder);
   remainder = CRC_16_bit_for_1BYTE(B_5, remainder);
   return remainder;
-  //Serial.print(remainder % 256);
-  //Serial.print(" ");
-  // Serial.println(remainder >> 8);
+
 }
 uint16_t generate_CRC_16_bit_for_3BYTE(uint8_t B_0, uint8_t B_1, uint8_t B_2) {
   uint16_t remainder = CRC_16_bit_for_1BYTE(B_0, 65535);
   remainder = CRC_16_bit_for_1BYTE(B_1, remainder);
   remainder = CRC_16_bit_for_1BYTE(B_2, remainder);
   return remainder;
-  //Serial.print(remainder % 256);
-  //Serial.print(" ");
-  //Serial.println(remainder >> 8);
 }
 uint16_t CRC_16_bit_for_1BYTE(uint16_t data, uint16_t last_data) {
   //if this is first data (i.e LAST_DATA==null), LAST_DATA= 65535 = FFFF
