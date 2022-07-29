@@ -1,2 +1,3 @@
 https://www.simplymodbus.ca/exceptions.htm
 https://www.modbustools.com/modbus.html
+https://control.com/forums/threads/modbus-bit-order.30164/
