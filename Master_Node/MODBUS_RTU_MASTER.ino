@@ -6,8 +6,6 @@
 #define WAIT_RESPONSE_TIME_ms 50
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx
 
-
-
 uint8_t B[8];//received bytes buffer
 
 void configure_master() {
@@ -88,7 +86,7 @@ void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, u
     for (int i = 0; i < 8; i++)B[i] = mySerial.read();
 
     uint16_t received_CRC = (((uint16_t)B[7]) << 8) + B[6];
-    uint16_t expected_CRC = generate_CRC_16_bit_for_6BYTE(B[0], B[1], B[2], B[3], B[4], B[5]);
+    uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5]);
 
     if (received_CRC !=  expected_CRC ) {//CRC CHECK
       //return;
@@ -116,31 +114,6 @@ uint16_t generate_CRC_16_bit(uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, 
 
 }
 
-uint16_t generate_CRC_16_bit_for_6BYTE(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
-  uint16_t remainder = CRC_16_bit_for_1BYTE(B_0, 65535);
-  remainder = CRC_16_bit_for_1BYTE(B_1, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_2, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_3, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_4, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_5, remainder);
-  return remainder;
-
-}
-uint16_t generate_CRC_16_bit_for_5BYTE(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4) {
-  uint16_t remainder = CRC_16_bit_for_1BYTE(B_0, 65535);
-  remainder = CRC_16_bit_for_1BYTE(B_1, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_2, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_3, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_4, remainder);
-  return remainder;
-
-}
-uint16_t generate_CRC_16_bit_for_3BYTE(uint8_t B_0, uint8_t B_1, uint8_t B_2) {
-  uint16_t remainder = CRC_16_bit_for_1BYTE(B_0, 65535);
-  remainder = CRC_16_bit_for_1BYTE(B_1, remainder);
-  remainder = CRC_16_bit_for_1BYTE(B_2, remainder);
-  return remainder;
-}
 uint16_t CRC_16_bit_for_1BYTE(uint16_t data, uint16_t last_data) {
   //if this is first data (i.e LAST_DATA==null), LAST_DATA= 65535 = FFFF
   uint16_t key = 40961; //1010 0000 0000 0001
