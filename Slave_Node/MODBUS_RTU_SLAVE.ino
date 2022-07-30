@@ -1,5 +1,5 @@
 #include <SoftwareSerial.h>
-#define ID 15
+uint8_t ID = 15;
 #define RX_PIN 2
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
@@ -9,9 +9,9 @@ SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx,
 
 
 
-void configure_slave() {
+void configure_slave(uint8_t id) {
+  ID = id;
   pinMode(OUT_ENABLE_PIN, OUTPUT);
-
   pinMode(RX_PIN, INPUT); //Probably also configured by SoftwareSerial library.
   pinMode(TX_PIN, OUTPUT);//Probably also configured by SoftwareSerial library.
   mySerial.begin(SOFTWARE_SERIAL_BAUD_RATE);
@@ -79,6 +79,7 @@ void slave_write( uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, uint8_t B_2
   uint16_t CRC = generate_CRC_16_bit(number_of_bytes, B_0,  B_1,  B_2,  B_3,  B_4,  B_5);
   uint8_t CRC_LEAST = CRC % 256;
   uint8_t CRC_SIGNIFICANT = CRC >> 8;
+  delay(WAIT_RESPONSE_TIME_ms);
 
   digitalWrite(OUT_ENABLE_PIN, HIGH);
   mySerial.write(B_0);
