@@ -3,13 +3,14 @@
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define WAIT_RESPONSE_TIME_ms 50
+#define WAIT_RESPONSE_TIME_ms 25
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx
 
 uint8_t B[8];//received bytes buffer
 
 void configure_master() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
+  digitalWrite(OUT_ENABLE_PIN, LOW);
   pinMode(RX_PIN, INPUT); //Probably also configured by SoftwareSerial library.
   pinMode(TX_PIN, OUTPUT);//Probably also configured by SoftwareSerial library.
   mySerial.begin(SOFTWARE_SERIAL_BAUD_RATE);
