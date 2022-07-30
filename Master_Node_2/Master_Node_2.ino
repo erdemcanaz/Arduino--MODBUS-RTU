@@ -11,6 +11,8 @@ void setup() {
 }
 
 void loop() { 
-  master_operate(); 
+  //master_operate(); 
+  test_endian();
+  delay(10);
 
 }
