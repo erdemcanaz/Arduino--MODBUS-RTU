@@ -1,9 +1,15 @@
+void master_write(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t );
+uint16_t generate_CRC_16_bit(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t );
+
+
 #include <SoftwareSerial.h>
+#define DEBUG false
 #define RX_PIN 2
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define WAIT_RESPONSE_TIME_ms 25
+#define WAIT_RESPONSE_TIMEOUT_ms  100
+#define WAIT_RESPONSE_TIME_ms  10
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx
 
 uint8_t B[8];//received bytes buffer
@@ -11,45 +17,58 @@ uint8_t B[8];//received bytes buffer
 void configure_master() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
   digitalWrite(OUT_ENABLE_PIN, LOW);
-  pinMode(RX_PIN, INPUT); //Probably also configured by SoftwareSerial library.
-  pinMode(TX_PIN, OUTPUT);//Probably also configured by SoftwareSerial library.
+  pinMode(RX_PIN, INPUT); //Probably, also, configured by SoftwareSerial library.
+  pinMode(TX_PIN, OUTPUT);//Probably, also, configured by SoftwareSerial library.
   mySerial.begin(SOFTWARE_SERIAL_BAUD_RATE);
 }
 
 void master_operate() {
+  while (mySerial.available())mySerial.read();
   if (Serial.available() >= 6) {
-    for (uint8_t i = 0; i < 6; i++)B[i] = Serial.parseInt() ;
+    for (uint8_t i = 0; i < 6; i++)B[i] = Serial.parseInt();
     master_write_and_read(B[0], B[1], B[2], B[3], B[4], B[5]);
     while (Serial.available())Serial.read();
   }
 }
+
 //SEND AND RECEIVE DATA
 void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
 
   uint16_t CRC = generate_CRC_16_bit(6, B_0,  B_1,  B_2,  B_3,  B_4,  B_5);
   uint8_t CRC_LEAST = CRC % 256;
   uint8_t CRC_SIGNIFICANT = CRC >> 8;
-
+  if (DEBUG)Serial.println(String(CRC_LEAST) + " " + String(CRC_SIGNIFICANT));
   digitalWrite(OUT_ENABLE_PIN, HIGH);
-  mySerial.write(B_0);//ID
-  mySerial.write(B_1);//FUNC CODE
-  mySerial.write(B_2);//REGISTER ADDRESS (SIG)
-  mySerial.write(B_3);//REGISTER ADDRESS (LST)
-  mySerial.write(B_4);//REGISTER VALUE (SIG)
-  mySerial.write(B_5);//REGISTER VALUE (LST)
-  mySerial.write(CRC_LEAST); //CRC (LST)
-  mySerial.write(CRC_SIGNIFICANT); //CRC (SIG)
+  //WRITE QUERY | READ QUERY
+  mySerial.write(B_0);                  //ID                    |ID
+  mySerial.write(B_1);                  //FUNC CODE             |FUNC CODE
+  mySerial.write(B_2);                  //REGISTER ADDRESS (SIG)|REGISTER ADDRESS (SIG)
+  mySerial.write(B_3);                  //REGISTER ADDRESS (LST)|REGISTER ADDRESS (LST)
+  mySerial.write(B_4);                  //REGISTER VALUE (SIG)  |NUMBER OF REGISTERS (SIG)
+  mySerial.write(B_5);                  //REGISTER VALUE (LST)  |NUMBER OF REGISTERS (LST)
+  mySerial.write(CRC_LEAST);            //CRC (LST)             |CRC (LST)
+  mySerial.write(CRC_SIGNIFICANT);      //CRC (SIG)             |CRC (SIG)
   digitalWrite(OUT_ENABLE_PIN, LOW);
 
-  for (int i = 0; i < 100; i++) {
-    if (mySerial.available() >= 1) {
+  unsigned long tic = millis();
+  boolean isTimedOut = true;
+  while ((millis() - tic) < WAIT_RESPONSE_TIMEOUT_ms) {
+    if (mySerial.available() > 0) {
+      isTimedOut = false;
       delay(WAIT_RESPONSE_TIME_ms);
       break;
     }
-    delay(WAIT_RESPONSE_TIME_ms);
+  }
+  if (DEBUG){
+    if (isTimedOut) Serial.println("!error-time out");
   }
 
+
   uint8_t number_of_bytes_received = mySerial.available();
+  if (DEBUG)Serial.println("Bytes received:" + String(number_of_bytes_received));
+
+  //for (int i = 0; i < number_of_bytes_received; i++)B[i] = Serial.println(mySerial.read());
+
   if (number_of_bytes_received == 5) { //Exception
 
     //ID, EXCEPTION RESPONSE FUNCTION CODE, EXCEPTION CODE, CRC (LST), CRC (SIG)
@@ -59,10 +78,12 @@ void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, u
     uint16_t expected_CRC = generate_CRC_16_bit(3, B[0], B[1], B[2], 0, 0, 0);
 
     if (received_CRC !=  expected_CRC ) {//CRC CHECK
+      if (DEBUG)Serial.println("!error-CRC mismatch-5 bytes");
       //return;
     } else if (B_0 == B[0]) {//ID check
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]));
     } else {
+      if (DEBUG)Serial.println("!error-ID mismatch-5 bytes");
       //return;
     }
   }
@@ -74,13 +95,14 @@ void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, u
     uint16_t expected_CRC = generate_CRC_16_bit(5, B[0], B[1], B[2], B[3], B[4], 0);
 
     if (received_CRC !=  expected_CRC ) {//CRC CHECK
+      if (DEBUG)Serial.println("!error-CRC mismatch-7 bytes");
       //return;
     } else if (B_0 == B[0]) {//ID check
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]));
     } else {
+      if (DEBUG) Serial.println("!error-ID mismatch-7 bytes");
       //return;
     }
-    while (mySerial.available())mySerial.read();
   }
   else if (number_of_bytes_received == 8) {//Reply for function code 6
     //0-ID, 1-FUNCTION CODE, 2-REGISTER ADDRESS(SIG), 3-REGISTER ADDRESS (LST), 4-REGISTER VALUE (SIG), 5-REGISTER VALUE (LST), 6-CRC (LST), 7-CRC(SIG)
@@ -90,16 +112,19 @@ void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, u
     uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5]);
 
     if (received_CRC !=  expected_CRC ) {//CRC CHECK
+      if (DEBUG)Serial.println("!error-CRC mismatch-8 bytes");
       //return;
     } else if (B_0 == B[0]) {//ID check
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]));
     } else {
+      if (DEBUG)Serial.println("!error-ID mismatch-8 bytes");
       //return;
     }
   } else {
-    //return;
+    if (DEBUG)Serial.println("!error-number of bytes received does not match");
+    //return
+
   }
-  while (mySerial.available())mySerial.read();
 }
 
 

@@ -1,12 +1,20 @@
 #include <SoftwareSerial.h>
-uint8_t ID = 15;
+uint8_t ID = 0;
 #define RX_PIN 2
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
 #define WAIT_RESPONSE_TIME_ms 10
+
+
+#define NUMBER_OF_HOLDING_REGISTERS 10
+#define NUMBER_OF_INPUT_REGISTERS 2
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx,
 
+uint16_t holding_registers[NUMBER_OF_HOLDING_REGISTERS];
+uint16_t input_registers[NUMBER_OF_INPUT_REGISTERS];
+
+uint8_t B[8];//received bytes buffer
 
 
 void configure_slave(uint8_t id) {
@@ -17,16 +25,8 @@ void configure_slave(uint8_t id) {
   mySerial.begin(SOFTWARE_SERIAL_BAUD_RATE);
 }
 
-uint16_t registers[128];
-uint8_t B[8];//received bytes buffer
 
 void slave_operate() {
-  slave_read();
-  //slave_execute_and_write();
-}
-
-
-void slave_read() {
   if (mySerial.available() >= 1)delay(WAIT_RESPONSE_TIME_ms);
   else return;
 
@@ -40,40 +40,67 @@ void slave_read() {
     while (mySerial.available())mySerial.read();
     return;
   }
-
+  //---------------ERROR CHECK
+  //1-ID CHECK
   if (B[0] != ID) {
     while (mySerial.available())mySerial.read();
+    slave_write(3, ID, 128, 7, 0, 0, 0);
     return;
   }
+  //2-CRC CHECK
   uint16_t received_CRC = (((uint16_t)B[7]) << 8) + B[6];
   uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5]);
 
   if (received_CRC != expected_CRC) {
     while (mySerial.available())mySerial.read();
+    slave_write(3, ID, 128, 7, 0, 0, 0);
     return;
   }
 
+  //------------------
 
-  if (B[1] == 3) {
+  if (B[1] == 3) {//read holding registers
     //QUERY: 0-ID, 1-FUNC_CODE, 2-REG_ADDR(SIG), 3-REG_ADDR(LST), 4-NUMBER_OF_REG(SIG), 5-NUMBER_OF_REG(LST), 6-CRC(LST), 7-CRC(SIG)
-    uint16_t register_addres = ((uint16_t)B[2] << 8) + B[3];
-    uint8_t register_val_sig = registers[register_addres]>>8;
-    uint8_t register_val_lst = registers[register_addres]%256;
-    
-    //RESPONSE: 0-ID, 1-FUNC_CODE, 2-BYTE_COUNT, 3-REG_VAL(SIG), 4-REG_VAL(LST), 5-CRC(LST), 6-CRC(SIG);
-    slave_write(5, B[0], B[1], 2, register_val_sig, register_val_lst,0);
-  }
-  else if (B[1] == 6) {
-    //QUERY: 0-ID, 1-FUNC_CODE, 2-REG_ADDR(SIG), 3-REG_ADDR(LST), 4-REG_VAL(SIG), 5-REG_VAL(LST), 6-CRC(LST), 7-CRC(SIG)
-    uint16_t register_addres = ((uint16_t)B[2] << 8) + B[3];
-    uint16_t register_val = ((uint16_t)B[4] << 8) + B[5]; //or number of register to read which is assuemd to be 1
-    registers[register_addres] = register_val;
+    uint16_t holding_register_addres = ((uint16_t)B[2] << 8) + B[3];
 
-    //RESPONSE: 0-ID, 1-FUNC_CODE, 2-REG_ADDR(SIG), 3-REG_ADDR(LST), 4-REG_VAL(SIG), 5-REG_VAL(LST), 6-CRC(LST), 7-CRC(SIG)
-    slave_write(6, B[0], B[1], B[2], B[3], B[4], B[5]);
+    if (holding_register_addres >= 0 && holding_register_addres < NUMBER_OF_HOLDING_REGISTERS) {
+      uint8_t val_sig = holding_registers[holding_register_addres] >> 8;
+      uint8_t val_lst = holding_registers[holding_register_addres] % 256;
+      //RESPONSE: 0-ID, 1-FUNC_CODE, 2-BYTE_COUNT, 3-REG_VAL(SIG), 4-REG_VAL(LST), 5-CRC(LST), 6-CRC(SIG);
+      slave_write(5, B[0], B[1], 2, val_sig, val_lst, 0);
+    } else slave_write(3, ID, 128, 7, 0, 0, 0);//holding register address is wrong
   }
+
+  else if (B[1] == 4) { //read input registers
+    //QUERY: 0-ID, 1-FUNC_CODE, 2-REG_ADDR(SIG), 3-REG_ADDR(LST), 4-NUMBER_OF_REG(SIG), 5-NUMBER_OF_REG(LST), 6-CRC(LST), 7-CRC(SIG)
+    uint16_t input_register_addres = ((uint16_t)B[2] << 8) + B[3];
+
+    if (input_register_addres >= 0 && input_register_addres < NUMBER_OF_INPUT_REGISTERS) {
+      uint8_t val_sig = input_registers[input_register_addres] >> 8;
+      uint8_t val_lst = input_registers[input_register_addres] % 256;
+      //RESPONSE: 0-ID, 1-FUNC_CODE, 2-BYTE_COUNT, 3-REG_VAL(SIG), 4-REG_VAL(LST), 5-CRC(LST), 6-CRC(SIG);
+      slave_write(5, B[0], B[1], 2, val_sig, val_lst, 0);
+    } else slave_write(3, ID, 128, 7, 0, 0, 0);//!input register address is wrong
+  }
+
+  else if (B[1] == 6) { //write holding registers
+    //QUERY: 0-ID, 1-FUNC_CODE, 2-REG_ADDR(SIG), 3-REG_ADDR(LST), 4-REG_VALUE(SIG), 5-REG_VAL(LST), 6-CRC(LST), 7-CRC(SIG)
+    uint16_t holding_register_addres = ((uint16_t)B[2] << 8) + B[3];
+
+    if (holding_register_addres >= 0 && holding_register_addres < NUMBER_OF_HOLDING_REGISTERS) {
+      holding_registers[holding_register_addres] = 0;
+      holding_registers[holding_register_addres] = (((uint16_t)B[4]) << 8) + B[5];
+      //RESPONSE: 0-ID, 1-FUNC_CODE, 2-REG_ADDR(SIG), 3-REG_ADDR(LST), 4-REG_VALUE(SIG), 5-REG_VAL(LST), 6-CRC(LST), 7-CRC(SIG)
+      slave_write(6, B[0], B[1], B[2], B[3], B[4], B[5]);
+    } else slave_write(3, ID, 128, 7, 0, 0, 0);//!holding register address is wrong
+  } else {
+    slave_write(3, ID, 128, 7, 0, 0, 0);//! unknown function code
+  }
+
 
 }
+
+
 
 void slave_write( uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
   uint16_t CRC = generate_CRC_16_bit(number_of_bytes, B_0,  B_1,  B_2,  B_3,  B_4,  B_5);
@@ -116,7 +143,29 @@ uint16_t CRC_16_bit_for_1BYTE(uint16_t data, uint16_t last_data) {
   }
   return data;
 }
+//-----------------------------------------
 
-uint16_t get_reg(uint8_t reg_addrs){
-  return registers[reg_addrs];
+void set_holding_register(uint16_t address, uint16_t val) {
+  if (address >= 0 && address < NUMBER_OF_HOLDING_REGISTERS) {
+    holding_registers[address] = val;
+  }
+}
+uint16_t get_holding_register(uint16_t address) {
+  if (address >= 0 && address < NUMBER_OF_HOLDING_REGISTERS) {
+    return holding_registers[address];
+  } else {
+    return 0;
+  }
+}
+void set_input_register(uint16_t address, uint16_t val) {
+  if (address >= 0 && address < NUMBER_OF_INPUT_REGISTERS) {
+    input_registers[address] = val;
+  }
+}
+uint16_t get_input_register(uint16_t address) {
+  if (address >= 0 && address < NUMBER_OF_INPUT_REGISTERS) {
+    return input_registers[address];
+  } else {
+    return 0;
+  }
 }
