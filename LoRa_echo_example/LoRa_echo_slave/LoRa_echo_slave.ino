@@ -23,8 +23,9 @@ void if_available_read_Lora_Buffer(){
     Serial.println("Aldığım mesaj");
     while (mySerial.available()) {     
       uint8_t c = mySerial.read();
-      mySerial.write(c);
-      Serial.println((uint8_t ) c);     
+      //mySerial.write(c);
+      //Serial.println(String((char) c) +" " +String((uint8_t ) c));     
+      Serial.println((uint8_t ) c); 
     }
     Serial.println();
   }

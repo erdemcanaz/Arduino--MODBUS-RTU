@@ -16,6 +16,7 @@ boolean OPERATE_AS_LORA_SLAVE = true;
 
 
 struct struct_query {
+  unsigned long time_created_ms = 0;
   boolean is_active = false;
   boolean is_responded = false;
   uint8_t B_query[8];
@@ -72,7 +73,7 @@ void operate_LoRa_node() {
 
   //master
   should_I_append_to_the_query_or_have_response_for_it();
-
+  listen_and_write_LoRa();
   //slave
 }
 
@@ -112,18 +113,19 @@ void listen_RS485() {
 
 void should_I_append_to_the_query_or_have_response_for_it() {
   if (!new_rs485)return;
-
-  if (B_RS485[8] != 8) { // is read or write reques by master
-    new_rs485 = false;
-    return;
-  }
-
+  
   if (B_RS485[0] == ID_LORA) {
     for (uint8_t i = 0; i < NUMBER_OF_QUERIES; i++)queries[i].is_active = false;
     set_all_ids_allowed();
     new_rs485 = false;
     return;
   }
+  if (B_RS485[8] != 8) { // is read or write reques by master
+    new_rs485 = false;
+    return;
+  }
+
+
 
   if ( !set_or_read_allowed_id(false, B_RS485[0], true) ) { //is an allowed id
     new_rs485 = false;
@@ -132,6 +134,7 @@ void should_I_append_to_the_query_or_have_response_for_it() {
 
   boolean should_append_query = true;
 
+  //-------------------------------------
   for (uint8_t i = 0; i < NUMBER_OF_QUERIES; i++) {
     boolean does_query_match = false;
     //1
@@ -142,7 +145,7 @@ void should_I_append_to_the_query_or_have_response_for_it() {
           does_query_match = false;
         }
       }
-      if (B_RS485(1) == 6) { //4- reg val, 5-reg val
+      if (B_RS485[1] == 6) { //4- reg val, 5-reg val
         if (queries[i].B_query[4] != B_RS485[4] || queries[i].B_query[5] != B_RS485[5]) {
           does_query_match = false;
         }
@@ -159,72 +162,95 @@ void should_I_append_to_the_query_or_have_response_for_it() {
     break;
   }
   //
-}
 
-//3
-
-if (should_append_query) {
-  boolean is_fail = true;
-  for (uint8_t i = 0; i < NUMBER_OF_QUERIES; i++) {
-    if (queries[i].is_active == false) {
-      for (int j = 0; j < 8; j++) {
-        queries[i].B_query[j] = B_RS485[j];
+  //--------------------------------------
+  if (should_append_query) {
+    boolean is_fail = true;
+    for (uint8_t i = 0; i < NUMBER_OF_QUERIES; i++) {
+      if (queries[i].is_active == false) {
+        for (int j = 0; j < 8; j++) {
+          queries[i].B_query[j] = B_RS485[j];
+        }
+        queries[i].time_created_ms = millis();
+        queries[i].is_active = true;
+        queries[i].is_responded = false;
+        is_fail = false;
+        break;
       }
-      queries[i].is_active = true;
-      is_fail = false;
-      break;
     }
+
+    if (is_fail) {
+      uint8_t overwrite_query_index = 0;
+      unsigned long time_dif = 0;
+      for (int i = 0; i < NUMBER_OF_QUERIES; i++) {
+        if (millis() - queries[i].time_created_ms > time_dif && i != query_counter) {
+          time_dif = millis() - queries[i].time_created_ms;
+          overwrite_query_index = i;
+        }
+      }
+      for (int j = 0; j < 8; j++) {
+        queries[overwrite_query_index].B_query[j] = B_RS485[j];
+      }
+      queries[overwrite_query_index].is_active = true;
+    }
+
   }
 
-  if (is_fail) {
-    uint8_t overwrite_query_index = (query_counter - 1) % NUMBER_OF_QUERIES;
-    for (int j = 0; j < 8; j++) {
-      queries[overwrite_query_index].B_query[j] = B_RS485[j];
-
-    }
-    queries[overwrite_query_index].is_active = true;
-  }
-
-}
-
-new_rs485 = false;
+  new_rs485 = false;
 }
 
 
-unsigned long last_query_broadcast = 0;
+unsigned long last_query_broadcast_time = 0;
 uint8_t B_LORA[8];//B_RS485[8] is reserved for number of bytes
 
 void listen_and_write_LoRa() {
-  if (millis() - last_query_broadcast < LORA_RESPONSE_TIME_ms)return;
-  last_query_broadcast = millis();
+
+  if (millis() - last_query_broadcast_time < LORA_RESPONSE_TIME_ms)return;
 
 
-  if (Serial.available() >= 1)delay(WAIT_RESPONSE_TIME_ms);
-  else return;
+  delay(WAIT_RESPONSE_TIME_ms);
 
+  boolean is_response_received = false;
   uint8_t number_of_bytes_received = Serial.available();
   if (number_of_bytes_received == 8) {//8: write-read request
     for (int i = 0; i < number_of_bytes_received; i++) {
       B_LORA[i] = Serial.read();
     }
+    is_response_received = true;
   } else {
     while (Serial.available())Serial.read();
-    return;
   }
   ////
+  if (is_response_received) { //cevap geldiyse ve active ise query ye eşitle
+    if (queries[query_counter].is_active) {
+      for (int i = 0; i < number_of_bytes_received; i++) {
+        queries[query_counter].B_response[i] = B_LORA[i];
+      }
+      queries[query_counter].B_response[8] = number_of_bytes_received;
+      queries[query_counter].is_responded = true;
+    }
+  } else { //cevap geldi mi önceki mesaja, gelmediyse önceki mesaja ait tüm id'li query leri sil(pasif hale getir) ve önceki mesajın id sini banla
+    uint8_t id_to_deactivate =  queries[query_counter].B_query[0];
+    set_or_read_allowed_id(true, id_to_deactivate , false);
+    for (int i = 0; i < NUMBER_OF_QUERIES; i++) {
+      if ( queries[i].B_query[0] == id_to_deactivate) {
+        queries[i].is_active = false;
+      }
+    }
 
-  //cevap geldi mi önceki mesaja, gelmediyse önceki mesaja ait tüm id'li query leri sil(pasif hale getir) ve önceki mesajın id sini banla
+  }
 
-  //cevap geldiyse query ye eşitle
-
-  //query yi sonraki active kadar arttır, (NUMBER_OF_QUERY kadar gittikten sonra break et)
-
-
-
-
+  ////
+  query_counter = (query_counter + 1) % NUMBER_OF_QUERIES;
+  if (queries[query_counter].is_active == true) {
+    last_query_broadcast_time = millis();
+    write_Serial( 6, queries[query_counter].B_query[0], queries[query_counter].B_query[1], queries[query_counter].B_query[2], queries[query_counter].B_query[3], queries[query_counter].B_query[4], queries[query_counter].B_query[5]);
+  }
 
 
 }
+
+
 void print_queries() {
   Serial.println("----------------");
   for (int i = 0; i < NUMBER_OF_QUERIES; i++) {
@@ -254,32 +280,41 @@ void print_queries() {
 
 
 
+void write_Serial( uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
+  uint16_t CRC = generate_CRC_16_bit(number_of_bytes, B_0,  B_1,  B_2,  B_3,  B_4,  B_5);
+  uint8_t CRC_LEAST = CRC % 256;
+  uint8_t CRC_SIGNIFICANT = CRC >> 8;
+
+  Serial.write(B_0);
+  if (number_of_bytes >= 2 )  Serial.write(B_1);
+  if (number_of_bytes >= 3 )  Serial.write(B_2);
+  if (number_of_bytes >= 4 )  Serial.write(B_3);
+  if (number_of_bytes >= 5 )  Serial.write(B_4);
+  if (number_of_bytes >= 6 )  Serial.write(B_5);
+  Serial.write(CRC_LEAST); //CRC (LST)
+  Serial.write(CRC_SIGNIFICANT); //CRC (SIG)
+
+}
 
 
+void write_RS485( uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
+  uint16_t CRC = generate_CRC_16_bit(number_of_bytes, B_0,  B_1,  B_2,  B_3,  B_4,  B_5);
+  uint8_t CRC_LEAST = CRC % 256;
+  uint8_t CRC_SIGNIFICANT = CRC >> 8;
+  delay(WAIT_RESPONSE_TIME_ms);
 
+  digitalWrite(OUT_ENABLE_PIN, HIGH);
+  RS485_Serial.write(B_0);
+  if (number_of_bytes >= 2 )  RS485_Serial.write(B_1);
+  if (number_of_bytes >= 3 )  RS485_Serial.write(B_2);
+  if (number_of_bytes >= 4 )  RS485_Serial.write(B_3);
+  if (number_of_bytes >= 5 )  RS485_Serial.write(B_4);
+  if (number_of_bytes >= 6 )  RS485_Serial.write(B_5);
+  RS485_Serial.write(CRC_LEAST); //CRC (LST)
+  RS485_Serial.write(CRC_SIGNIFICANT); //CRC (SIG)
+  digitalWrite(OUT_ENABLE_PIN, LOW);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}
 
 //MAGICAL CRC_16 MODBUS code.
 uint16_t generate_CRC_16_bit(uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
