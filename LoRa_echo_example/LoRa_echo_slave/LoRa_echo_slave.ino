@@ -9,22 +9,21 @@ void setup() {
 
 }
 
+
+uint8_t num = 0;
 void loop() {  
-  for(int i=0;i<5;i++){
-    
-  }  
-  delay(1000);
+ if_available_read_Lora_Buffer();
 
+  
 }
 
-void broad_byte(uint8_t i){
-  mySerial.write(i);
-}
+
 void if_available_read_Lora_Buffer(){
   if (mySerial.available() > 0) {
-    delay(10);
-    while (mySerial.available()) {
+    Serial.println("Aldığım mesaj");
+    while (mySerial.available()) {     
       uint8_t c = mySerial.read();
+      mySerial.write(c);
       Serial.println((uint8_t ) c);     
     }
     Serial.println();
