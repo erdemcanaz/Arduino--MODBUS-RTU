@@ -1,15 +1,19 @@
 
 
 void setup() {
-  Serial.begin(9600);  
-  configure_slave(14);  
-  pinMode(13,OUTPUT);
+  delay(5000);
+  Serial.begin(9600);
+  configure_lora_node();
 }
 
-void loop() {  
-  slave_operate();
-  set_input_register(0,random(255));
-  int state = get_holding_register(0);
-  if(state)digitalWrite(13,HIGH);
-  else digitalWrite(13,LOW);
+unsigned long tic = 0;
+void loop() {   
+   
+  operate_LoRa_node();
+  
+  /*if(millis()-tic >5000){
+    print_queries();
+    tic = millis();
+  }*/
+  
 }
