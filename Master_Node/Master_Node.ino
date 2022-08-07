@@ -8,5 +8,4 @@ void setup() {
 
 void loop() {
   master_operate();
-
 }
