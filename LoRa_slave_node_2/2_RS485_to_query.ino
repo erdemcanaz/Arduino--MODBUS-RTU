@@ -30,6 +30,11 @@ void RS485_to_query() {
 
   //PAKET HALİHAZIRDA QUERY'DE Mİ KONTROL ET
   uint8_t id = package_RS485.B[0];
+  if(id == 254){
+    /*!do lora slave commands
+     * 
+     */
+  }
   uint8_t function_code = package_RS485.B[1];
   uint8_t reg_add_sig = package_RS485.B[2];
   uint8_t reg_add_lst = package_RS485.B[3];

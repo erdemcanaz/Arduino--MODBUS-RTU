@@ -9,15 +9,18 @@ SoftwareSerial serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx,
 void configure_lora_node() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
   digitalWrite(OUT_ENABLE_PIN, LOW);
+  Serial.begin(9600);
   serial_RS485.begin(SOFTWARE_SERIAL_BAUD_RATE);
 }
 struct serial_package {
   uint8_t B[8];
   uint8_t byte_count = 0;
   unsigned long time_received_ms = 0;
-
+  
   boolean has_valid_CRC = false;
   boolean analyzed_by_RS485_to_query = true;
+  boolean analyzed_by_query_to_LoRa = true;
+  boolean analyzed_by_determine_operation_mode = true;
 };
 serial_package package_RS485, package_LoRa;
 
@@ -28,7 +31,7 @@ void listen_RS485() {
 
 
   uint8_t byte_count_dummy = serial_RS485.available();
-  if (byte_count_dummy < 5 || byte_count_dummy > 8) {
+  if (byte_count_dummy < 5 || byte_count_dummy > 8 || byte_count_dummy == 6) {
     while (serial_RS485.available())serial_RS485.read();
     return;
   }
@@ -47,4 +50,5 @@ void listen_RS485() {
   else package_RS485.has_valid_CRC = false;
 
   package_RS485.analyzed_by_RS485_to_query = false;
+  package_RS485.analyzed_by_determine_operation_mode = false;
 }
