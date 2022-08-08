@@ -12,7 +12,7 @@ struct struct_query {
 };
 
 struct_query query_list[NUMBER_OF_QUERIES];
-uint8_t LoRa_query_index = 0;
+
 
 void RS485_to_query() {
   if (package_RS485.analyzed_by_RS485_to_query == true)return;
@@ -131,7 +131,7 @@ void RS485_to_query() {
 //DEBUG
 unsigned long last_print = 0;
 void print_queries() {
-  if (millis() - last_print < 1000)return;
+  if (millis() - last_print < 30000)return;
   last_print = millis();
   Serial.println("-----------------------------");
   for (int i = 0; i < NUMBER_OF_QUERIES; i++) {
