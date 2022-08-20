@@ -1,27 +1,37 @@
 #define DEBUG true
-
+#define MASTER_CLEAR_HARDWARE_SERIAL_TIMEOUT_ms 3000
 #include <SoftwareSerial.h>
 #define SOFTWARE_RX_PIN 2
 #define SOFTWARE_TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define WAIT_RESPONSE_TIMEOUT_ms  1000
-#define WAIT_RESPONSE_TIME_ms  10
-SoftwareSerial softwareSerial(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
+#define TIMEOUT_ms  50
+#define WAIT_TIME_ms  10
+SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
 void configure_master() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
   digitalWrite(OUT_ENABLE_PIN, LOW);
   pinMode(SOFTWARE_RX_PIN, INPUT); //Probably, also, configured by SoftwareSerial library.
   pinMode(SOFTWARE_TX_PIN, OUTPUT);//Probably, also, configured by SoftwareSerial library.
-  softwareSerial.begin(SOFTWARE_SERIAL_BAUD_RATE);
+  software_serial_RS485.begin(SOFTWARE_SERIAL_BAUD_RATE);
 }
 
+
+unsigned long last_time_master_operated = 0;
+
 void master_operate() {
-  while (softwareSerial.available())softwareSerial.read();
+  while (software_serial_RS485.available())software_serial_RS485.read();
 
-  if (Serial.available() < 6)return;
-
+  if (Serial.available() < 6){
+    if( (millis() - last_time_master_operated) > MASTER_CLEAR_HARDWARE_SERIAL_TIMEOUT_ms){
+      while(Serial.available())Serial.read();
+      last_time_master_operated = millis();      
+    }
+    return;
+  }  
+  last_time_master_operated = millis();
+  
   uint8_t B[8];
   for (uint8_t i = 0 ; i < 6 ; i++) B[i] = Serial.parseInt();
 
@@ -30,20 +40,20 @@ void master_operate() {
   uint8_t CRC_SIGNIFICANT = CRC >> 8;
 
   digitalWrite(OUT_ENABLE_PIN, HIGH);
-  for (uint8_t i = 0 ; i < 6; i++)softwareSerial.write(B[i]);
-  softwareSerial.write(CRC_LEAST);
-  softwareSerial.write(CRC_SIGNIFICANT);
+  for (uint8_t i = 0 ; i < 6; i++)software_serial_RS485.write(B[i]);
+  software_serial_RS485.write(CRC_LEAST);
+  software_serial_RS485.write(CRC_SIGNIFICANT);
   digitalWrite(OUT_ENABLE_PIN, LOW);
 
   delay(1);
-  while (softwareSerial.available())softwareSerial.read();
+  while (software_serial_RS485.available())software_serial_RS485.read();
 
   unsigned long tic = millis();
   boolean isTimedOut = true;
-  while ((millis() - tic) < WAIT_RESPONSE_TIMEOUT_ms) {
-    if (softwareSerial.available() > 0) {
+  while ((millis() - tic) < TIMEOUT_ms) {
+    if (software_serial_RS485.available() > 0) {
       isTimedOut = false;
-      delay(WAIT_RESPONSE_TIME_ms);
+      delay(WAIT_TIME_ms);
       break;
     }
   }
@@ -53,8 +63,8 @@ void master_operate() {
   }
 
 
-  uint8_t number_of_bytes_received = softwareSerial.available();
-  for (int i = 0; i < number_of_bytes_received; i++)B[i] = softwareSerial.read();
+  uint8_t number_of_bytes_received = software_serial_RS485.available();
+  for (int i = 0; i < number_of_bytes_received; i++)B[i] = software_serial_RS485.read();
 
   //Exception-response
   if (number_of_bytes_received == 5) {
