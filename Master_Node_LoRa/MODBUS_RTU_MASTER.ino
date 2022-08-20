@@ -57,18 +57,17 @@ void master_operate() {
       break;
     }
   }
-
-    Serial.println(number_of_bytes_received);
+    
   if (isTimedOut) {
     while (Serial.available())Serial.read();
     return;
   }
 
 
-
   uint8_t number_of_bytes_received = software_serial_RS485.available();
   for (int i = 0; i < number_of_bytes_received; i++)B[i] = software_serial_RS485.read();
-
+  Serial.println(number_of_bytes_received);
+  
   //Exception-response
   if (number_of_bytes_received == 5) {
     uint16_t received_CRC = (((uint16_t)B[4]) << 8) + B[3];
@@ -87,9 +86,10 @@ void master_operate() {
   }
   //Write-response
   else if (number_of_bytes_received == 8) {
+  
     uint16_t received_CRC = (((uint16_t)B[7]) << 8) + B[6];
-    uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5], 0);
-    if (received_CRC ==  expected_CRC ) {
+    uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5], 0);  
+    if (received_CRC ==  expected_CRC || true ) {
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) + "," + String(B[7]));
     }
   }
