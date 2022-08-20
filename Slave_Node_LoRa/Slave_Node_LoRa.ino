@@ -6,6 +6,7 @@ void setup() {
 
 void loop() {
   listen_RS485();
+  listen_LoRa();
   operate();
   
 }

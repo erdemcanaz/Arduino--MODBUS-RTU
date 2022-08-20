@@ -2,16 +2,16 @@
 #define LORA_ID 254
 
 #include <SoftwareSerial.h>
-#define SOFTWARE_RX_PIN 2
-#define SOFTWARE_TX_PIN 3
+#define SOFTWARE_RX_PIN 8
+#define SOFTWARE_TX_PIN 9
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define TIMEOUT_ms  1000
+#define TIMEOUT_ms  5000
 #define WAIT_TIME_ms  10
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
-#define BROADCAST_MASTER_TIMEOUT_ms 500
-#define BROADCAST_SLAVE_TIMEOUT_ms 300
+#define BROADCAST_MASTER_TIMEOUT_ms 4000
+#define BROADCAST_SLAVE_TIMEOUT_ms 500
 
 void configure_slave() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
@@ -61,4 +61,35 @@ void listen_RS485() {
   
   while(software_serial_RS485.available())software_serial_RS485.read();
 
+}
+
+void listen_LoRa(){
+  if (Serial.available() < 1)return; //No serial data is received
+  delay(WAIT_TIME_ms);
+  
+  uint8_t byte_count_dummy = Serial.available();
+
+  if (byte_count_dummy <5 ) {
+    while (Serial.available())Serial.read();
+    return;
+  }
+
+  if (byte_count_dummy > 9) byte_count_dummy = 9;
+
+  package_LoRa.byte_count = byte_count_dummy;
+  
+  for (uint8_t i = 0; i < byte_count_dummy; i++) {
+    package_LoRa.B[i] = Serial.read();
+  }
+   
+  uint16_t received_CRC = ((uint16_t)package_LoRa.B[byte_count_dummy - 1] << 8) + package_LoRa.B[byte_count_dummy - 2];
+  uint16_t expected_CRC = generate_CRC_16_bit(byte_count_dummy - 2, package_LoRa.B[0],  package_LoRa.B[1],  package_LoRa.B[2],  package_LoRa.B[3],  package_LoRa.B[4],  package_LoRa.B[5], package_LoRa.B[6]);
+  
+  if (received_CRC == expected_CRC)package_LoRa.has_valid_CRC = true;
+  else package_LoRa.has_valid_CRC = false;
+
+  package_LoRa.time_received_ms = millis();
+  package_LoRa.is_new = true;
+  
+  while(Serial.available())Serial.read();  
 }

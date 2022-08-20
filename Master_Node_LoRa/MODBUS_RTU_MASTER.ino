@@ -5,7 +5,7 @@
 #define SOFTWARE_TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define TIMEOUT_ms  50
+#define TIMEOUT_ms  5000
 #define WAIT_TIME_ms  10
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
@@ -57,10 +57,13 @@ void master_operate() {
       break;
     }
   }
+
+    Serial.println(number_of_bytes_received);
   if (isTimedOut) {
     while (Serial.available())Serial.read();
     return;
   }
+
 
 
   uint8_t number_of_bytes_received = software_serial_RS485.available();
