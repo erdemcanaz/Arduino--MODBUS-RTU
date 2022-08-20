@@ -3,12 +3,12 @@ uint16_t generate_CRC_16_bit(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , u
 
 
 #include <SoftwareSerial.h>
-#define DEBUG false
+#define DEBUG true
 #define RX_PIN 2
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define WAIT_RESPONSE_TIMEOUT_ms  100
+#define WAIT_RESPONSE_TIMEOUT_ms  50
 #define WAIT_RESPONSE_TIME_ms  10
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx
 
@@ -49,7 +49,10 @@ void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, u
   mySerial.write(CRC_LEAST);            //CRC (LST)             |CRC (LST)
   mySerial.write(CRC_SIGNIFICANT);      //CRC (SIG)             |CRC (SIG)
   digitalWrite(OUT_ENABLE_PIN, LOW);
-
+  
+  delay(1);//datayı gönderirken RI pini LOW'a düşüyor. bu yüzden de serial data okuyor. onu temizliyor bu kod
+  while(mySerial.available())mySerial.read();//datayı gönderirken RI pini LOW'a düşüyor. bu yüzden de serial data okuyor. onu temizliyor bu kod
+  
   unsigned long tic = millis();
   boolean isTimedOut = true;
   while ((millis() - tic) < WAIT_RESPONSE_TIMEOUT_ms) {

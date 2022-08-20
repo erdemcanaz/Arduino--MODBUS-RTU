@@ -1,5 +1,5 @@
 #include <SoftwareSerial.h>
-uint8_t ID = 0;
+uint8_t ID = 14;
 #define RX_PIN 2
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
@@ -7,8 +7,8 @@ uint8_t ID = 0;
 #define WAIT_RESPONSE_TIME_ms 10
 
 
-#define NUMBER_OF_HOLDING_REGISTERS 10
-#define NUMBER_OF_INPUT_REGISTERS 2
+#define NUMBER_OF_HOLDING_REGISTERS 10 // FC:3
+#define NUMBER_OF_INPUT_REGISTERS 2 //FC:4
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx,
 
 uint16_t holding_registers[NUMBER_OF_HOLDING_REGISTERS];
