@@ -1,4 +1,5 @@
 #define DEBUG true
+#define LORA_ID 254
 
 #include <SoftwareSerial.h>
 #define SOFTWARE_RX_PIN 2
@@ -8,6 +9,9 @@
 #define TIMEOUT_ms  1000
 #define WAIT_TIME_ms  10
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
+
+#define BROADCAST_MASTER_TIMEOUT_ms 500
+#define BROADCAST_SLAVE_TIMEOUT_ms 300
 
 void configure_slave() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
@@ -21,8 +25,8 @@ struct dataPackage {
   uint8_t B[9];
   uint8_t byte_count = 0;
   unsigned long time_received_ms = 0;
-
   boolean has_valid_CRC = false;
+  boolean is_new = false;
 
 };
 dataPackage package_RS485, package_LoRa;
@@ -53,6 +57,7 @@ void listen_RS485() {
   else package_RS485.has_valid_CRC = false;
 
   package_RS485.time_received_ms = millis();
+  package_RS485.is_new = true;
   
   while(software_serial_RS485.available())software_serial_RS485.read();
 

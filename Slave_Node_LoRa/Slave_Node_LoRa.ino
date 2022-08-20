@@ -6,6 +6,6 @@ void setup() {
 
 void loop() {
   listen_RS485();
-  test();
+  operate();
   
 }
