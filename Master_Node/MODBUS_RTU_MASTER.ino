@@ -8,7 +8,7 @@ uint16_t generate_CRC_16_bit(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , u
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define WAIT_RESPONSE_TIMEOUT_ms  50
+#define WAIT_RESPONSE_TIMEOUT_ms  1000
 #define WAIT_RESPONSE_TIME_ms  10
 SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx
 
