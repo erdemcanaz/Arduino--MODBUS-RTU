@@ -25,7 +25,7 @@ void master_operate() {
   uint8_t B[8];
   for (uint8_t i = 0 ; i < 6 ; i++) B[i] = Serial.parseInt();
 
-  uint16_t CRC = generate_CRC_16_bit(6, B[0],  B[1],  B[2],  B[3],  B[4],  B[5]);
+  uint16_t CRC = generate_CRC_16_bit(6, B[0],  B[1],  B[2],  B[3],  B[4],  B[5], 0);
   uint8_t CRC_LEAST = CRC % 256;
   uint8_t CRC_SIGNIFICANT = CRC >> 8;
 
@@ -55,29 +55,29 @@ void master_operate() {
 
   uint8_t number_of_bytes_received = softwareSerial.available();
   for (int i = 0; i < number_of_bytes_received; i++)B[i] = softwareSerial.read();
-  
+
   //Exception-response
-  if (number_of_bytes_received == 5) {     
+  if (number_of_bytes_received == 5) {
     uint16_t received_CRC = (((uint16_t)B[4]) << 8) + B[3];
-    uint16_t expected_CRC = generate_CRC_16_bit(3, B[0], B[1], B[2], 0, 0, 0);
+    uint16_t expected_CRC = generate_CRC_16_bit(3, B[0], B[1], B[2], 0, 0, 0, 0);
     if (received_CRC ==  expected_CRC ) {
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) );
-    }    
+    }
   }
   //Read-response
   else if (number_of_bytes_received == 7) {
     uint16_t received_CRC = (((uint16_t)B[6]) << 8) + B[5];
-    uint16_t expected_CRC = generate_CRC_16_bit(5, B[0], B[1], B[2], B[3], B[4], 0);
+    uint16_t expected_CRC = generate_CRC_16_bit(5, B[0], B[1], B[2], B[3], B[4], 0, 0);
     if (received_CRC ==  expected_CRC ) {
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) );
     }
   }
   //Write-response
-   else if (number_of_bytes_received == 8) {
+  else if (number_of_bytes_received == 8) {
     uint16_t received_CRC = (((uint16_t)B[7]) << 8) + B[6];
-    uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5]);
+    uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5], 0);
     if (received_CRC ==  expected_CRC ) {
-      Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6])+","+String(B[7]));
+      Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) + "," + String(B[7]));
     }
   }
 
