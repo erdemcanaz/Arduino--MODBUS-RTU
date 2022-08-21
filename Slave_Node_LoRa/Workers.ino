@@ -38,6 +38,7 @@ void set_operation_mode() {
     }
     package_LoRa.is_new = false;
   }
+
 }
 
 
@@ -86,26 +87,29 @@ void operate_as_broadcast_master() {
 
 void operate_as_broadcast_slave() {
 
-  delay(WAIT_TIME_ms);
+
+  package_RS485.is_new = false;
+
+  uint16_t CRC = generate_CRC_16_bit(6, package_LoRa.B[1], package_LoRa.B[2], package_LoRa.B[3], package_LoRa.B[4], package_LoRa.B[5], package_LoRa.B[6], 0);
+  uint8_t CRC_lst = CRC % 256;
+  uint8_t CRC_sig = CRC >> 8;
+
   digitalWrite(OUT_ENABLE_PIN, HIGH);
-  for (uint8_t i = 1; i < 9; i++)software_serial_RS485.write(package_LoRa.B[i]);
+  for (uint8_t i = 1; i < 7; i++)software_serial_RS485.write(package_LoRa.B[i]);
+  software_serial_RS485.write(CRC_lst);
+  software_serial_RS485.write(CRC_sig);
   digitalWrite(OUT_ENABLE_PIN, LOW);
+  //
 
-  //! timeout available()- RS485 den gelcek cevabı bekle, cevap gelirse loradan yay
-  
-  
-  if (package_LoRa.has_valid_CRC) {
-    Serial.write(14);
-    Serial.write(6);
-    Serial.write(0);
-    Serial.write(0);
-    Serial.write(0);
-    Serial.write(1);
-    Serial.write(72);
-    Serial.write(245);
+  unsigned long tic = millis();
+  while ( (millis() - tic) < BROADCAST_SLAVE_TIMEOUT_ms) {
+    listen_RS485();
+    if (package_RS485.is_new) {     
+      if (!package_RS485.has_valid_CRC)break;
+        for (uint8_t i=0; i < package_RS485.byte_count ; i++)Serial.write(package_RS485.B[i]);
+        break;
+    }
   }
-
-
 
   //END
   while (software_serial_RS485.available())software_serial_RS485.read();
@@ -113,51 +117,4 @@ void operate_as_broadcast_slave() {
   package_LoRa.is_new = false;
   package_RS485.is_new = false;
   operation_mode = 0;
-}
-
-
-
-
-
-
-
-/*
-
-*/
-
-
-
-/*unsigned long tic = millis();
-  while ( (millis() - tic) < BROADCAST_SLAVE_TIMEOUT_ms) {
-  listen_RS485();
-  if (package_RS485.is_new) {
-    if (!package_RS485.has_valid_CRC)break;
-    for (uint8_t i = 0; i < package_RS485.byte_count; i++)Serial.write(package_RS485.B[i]);
-  }
-  }*/
-
-
-
-
-
-
-
-
-
-
-//------------------------------------------------------
-unsigned long last_time__test = 0;
-void test() {
-  if (package_RS485.time_received_ms == last_time__test)return;
-  last_time__test = millis();
-
-  Serial.println();
-
-  for (uint8_t i = 0; i < package_RS485.byte_count; i++) {
-    Serial.print(String(package_RS485.B[i]) + " ");
-  } Serial.println();
-
-  Serial.println("Byte count: " + String(package_RS485.byte_count));
-  Serial.println("CRC:" + String(package_RS485.has_valid_CRC));
-  Serial.println("Received when:" + String(package_RS485.time_received_ms));
 }

@@ -2,16 +2,16 @@
 #define LORA_ID 254
 
 #include <SoftwareSerial.h>
-#define SOFTWARE_RX_PIN 8
-#define SOFTWARE_TX_PIN 9
-#define OUT_ENABLE_PIN 4
+#define SOFTWARE_RX_PIN 8 //default: 8
+#define SOFTWARE_TX_PIN 9 //default: 9
+#define OUT_ENABLE_PIN 5 // default: 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define TIMEOUT_ms  1500
-#define WAIT_TIME_ms  10
+#define TIMEOUT_ms  1500 //if lora communication, takes about 600ms, otherwise takes about 50ms
+#define WAIT_TIME_ms  15
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
 #define BROADCAST_MASTER_TIMEOUT_ms 750 //takes about 500ms
-#define BROADCAST_SLAVE_TIMEOUT_ms 350 //takes about 50ms
+#define BROADCAST_SLAVE_TIMEOUT_ms 150 //takes about 50ms
 
 void configure_slave() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);

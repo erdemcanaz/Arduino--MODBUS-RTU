@@ -5,8 +5,8 @@
 #define SOFTWARE_TX_PIN 9
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define TIMEOUT_ms  1500
-#define WAIT_TIME_ms  10
+#define TIMEOUT_ms  1500 //if lora communication, takes about 600ms, otherwise takes about 50ms
+#define WAIT_TIME_ms  15
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
 void configure_master() {
@@ -32,7 +32,7 @@ void master_operate() {
   }  
   last_time_master_operated = millis();
   
-  uint8_t B[8];
+  uint8_t B[9];
   for (uint8_t i = 0 ; i < 6 ; i++) B[i] = Serial.parseInt();
 
   uint16_t CRC = generate_CRC_16_bit(6, B[0],  B[1],  B[2],  B[3],  B[4],  B[5], 0);
@@ -89,6 +89,9 @@ void master_operate() {
     if (received_CRC ==  expected_CRC || true ) {
       Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) + "," + String(B[7]));
     }
+  }
+  else{
+    //for(int i = 0 ; i< 9;i++)Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) + "," + String(B[7])+","+String(B[8]));
   }
 
   while (Serial.available())Serial.read();
