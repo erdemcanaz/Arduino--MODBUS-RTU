@@ -76,7 +76,6 @@ void operate_as_broadcast_master() {
 
   }
 
-
   //END
   while (software_serial_RS485.available())software_serial_RS485.read();
   while (Serial.available())Serial.read();
