@@ -1,8 +1,8 @@
 #define DEBUG true
 #define MASTER_CLEAR_HARDWARE_SERIAL_TIMEOUT_ms 3000
 #include <SoftwareSerial.h>
-#define SOFTWARE_RX_PIN 2
-#define SOFTWARE_TX_PIN 3
+#define SOFTWARE_RX_PIN 8
+#define SOFTWARE_TX_PIN 9
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
 #define TIMEOUT_ms  1500

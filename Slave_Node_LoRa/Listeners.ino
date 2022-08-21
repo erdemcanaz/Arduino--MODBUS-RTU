@@ -10,8 +10,8 @@
 #define WAIT_TIME_ms  10
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
-#define BROADCAST_MASTER_TIMEOUT_ms 1000
-#define BROADCAST_SLAVE_TIMEOUT_ms 350
+#define BROADCAST_MASTER_TIMEOUT_ms 750 //takes about 500ms
+#define BROADCAST_SLAVE_TIMEOUT_ms 350 //takes about 50ms
 
 void configure_slave() {
   pinMode(OUT_ENABLE_PIN, OUTPUT);
