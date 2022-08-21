@@ -10,14 +10,14 @@ void operate() {
   else if (operation_mode == 2)operate_as_broadcast_slave();
 }
 
+
 void set_operation_mode() {
-  //!operation mode belli bir süre sonra 0 lansın (timeout)
 
   if (operation_mode != 0)return;
 
   //1: operate as broadcast master
-  if (package_RS485.is_new && package_RS485.has_valid_CRC) {
-    if (package_RS485.B[0] == LORA_ID) {
+  if (package_RS485.is_new) {
+    if (package_RS485.B[0] == LORA_ID && package_RS485.has_valid_CRC) {
 
       delay(WAIT_TIME_ms);
       digitalWrite(OUT_ENABLE_PIN, HIGH);
@@ -31,25 +31,24 @@ void set_operation_mode() {
   }
 
   //2: operate as broadcast slave
-  if (package_LoRa.is_new && package_LoRa.has_valid_CRC) {
-    if (package_LoRa.B[0] == LORA_ID && package_LoRa.byte_count == 9) {
+  if (package_LoRa.is_new) {
+    if (package_LoRa.B[0] == LORA_ID && package_LoRa.has_valid_CRC && package_LoRa.byte_count == 9) {
       operation_mode = 2;
       package_RS485.is_new = false;
     }
-
     package_LoRa.is_new = false;
-
   }
 }
 
 
 void operate_as_broadcast_master() {
-  if (package_RS485.byte_count != 8) {
-    operation_mode = 0;
-    return;
-  }
   if (!package_RS485.is_new)return;
-  
+  package_RS485.is_new = false;
+  operation_mode = 0;
+
+  if (package_RS485.byte_count != 8)return;
+
+
   uint16_t CRC = generate_CRC_16_bit(7, 254, package_RS485.B[0],  package_RS485.B[1],  package_RS485.B[2],  package_RS485.B[3],  package_RS485.B[4],  package_RS485.B[5]);
   uint8_t CRC_lst = CRC % 256;
   uint8_t CRC_sig = CRC >> 8;
@@ -59,23 +58,23 @@ void operate_as_broadcast_master() {
   Serial.write(CRC_lst);
   Serial.write(CRC_sig);
 
-  delay(800);  
-  
-  //unsigned long tic = millis();  
-  //while ( (millis() - tic) < BROADCAST_MASTER_TIMEOUT_ms) {  
-    listen_LoRa();    
-    if (package_LoRa.is_new) {   
-      //if (!package_LoRa.has_valid_CRC || package_LoRa.B[0] == 254 )break;
+  unsigned long tic = millis();
+  while ( (millis() - tic) < BROADCAST_MASTER_TIMEOUT_ms) {
+    listen_LoRa();
+
+    if (package_LoRa.is_new) {
+      if (!package_LoRa.has_valid_CRC || package_LoRa.B[0] == 254 )break;
+      if (package_LoRa.B[0] == 254 )break;
+
       delay(WAIT_TIME_ms);
       digitalWrite(OUT_ENABLE_PIN, HIGH);
-      for (uint8_t i = 0 ; i < 6; i++)software_serial_RS485.write(package_LoRa.B[i]);
-      software_serial_RS485.write(package_RS485.B[6]);
-      software_serial_RS485.write(package_RS485.B[7]);
+      for (uint8_t i = 0 ; i < package_LoRa.byte_count; i++)software_serial_RS485.write(package_LoRa.B[i]);
       digitalWrite(OUT_ENABLE_PIN, LOW);
-      //break;
+      break;
     }
- // }
-  
+
+  }
+
 
   //END
   while (software_serial_RS485.available())software_serial_RS485.read();
@@ -87,26 +86,27 @@ void operate_as_broadcast_master() {
 
 void operate_as_broadcast_slave() {
 
+  delay(WAIT_TIME_ms);
+  digitalWrite(OUT_ENABLE_PIN, HIGH);
   for (uint8_t i = 1; i < 9; i++)software_serial_RS485.write(package_LoRa.B[i]);
+  digitalWrite(OUT_ENABLE_PIN, LOW);
+
+  //! timeout available()- RS485 den gelcek cevabı bekle, cevap gelirse loradan yay
   
-  delay(400);
-  uint16_t CRC = generate_CRC_16_bit(6, package_LoRa.B[0],  package_LoRa.B[1],  package_LoRa.B[2],  package_LoRa.B[3],  package_LoRa.B[4],  package_LoRa.B[5],0);
-  uint8_t CRC_lst = CRC % 256;
-  uint8_t CRC_sig = CRC >> 8;
   
-  for (uint8_t i = 1; i < package_LoRa.byte_count; i++)Serial.write(package_LoRa.B[i]);
-  
-  /*
-  unsigned long tic = millis();
-  while ( (millis() - tic) < BROADCAST_SLAVE_TIMEOUT_ms) {
-    listen_RS485();
-    if (package_RS485.is_new) {
-      if (!package_RS485.has_valid_CRC)break;
-      for (uint8_t i = 0; i < package_RS485.byte_count; i++)Serial.write(package_RS485.B[i]);
-    }
-  }  
-  */
-  
+  if (package_LoRa.has_valid_CRC) {
+    Serial.write(14);
+    Serial.write(6);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(0);
+    Serial.write(1);
+    Serial.write(72);
+    Serial.write(245);
+  }
+
+
+
   //END
   while (software_serial_RS485.available())software_serial_RS485.read();
   while (Serial.available())Serial.read();
@@ -121,9 +121,20 @@ void operate_as_broadcast_slave() {
 
 
 
+/*
+
+*/
 
 
 
+/*unsigned long tic = millis();
+  while ( (millis() - tic) < BROADCAST_SLAVE_TIMEOUT_ms) {
+  listen_RS485();
+  if (package_RS485.is_new) {
+    if (!package_RS485.has_valid_CRC)break;
+    for (uint8_t i = 0; i < package_RS485.byte_count; i++)Serial.write(package_RS485.B[i]);
+  }
+  }*/
 
 
 
