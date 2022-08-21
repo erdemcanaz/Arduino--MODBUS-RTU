@@ -5,7 +5,7 @@
 #define SOFTWARE_TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define TIMEOUT_ms  5000
+#define TIMEOUT_ms  1500
 #define WAIT_TIME_ms  10
 SoftwareSerial software_serial_RS485(SOFTWARE_RX_PIN, SOFTWARE_TX_PIN);//Rx,Tx
 
@@ -44,9 +44,6 @@ void master_operate() {
   software_serial_RS485.write(CRC_LEAST);
   software_serial_RS485.write(CRC_SIGNIFICANT);
   digitalWrite(OUT_ENABLE_PIN, LOW);
-
-  delay(1);
-  while (software_serial_RS485.available())software_serial_RS485.read();
 
   unsigned long tic = millis();
   boolean isTimedOut = true;
