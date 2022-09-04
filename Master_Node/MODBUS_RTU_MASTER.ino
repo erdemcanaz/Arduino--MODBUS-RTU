@@ -38,6 +38,7 @@ void master_operate()
     mySerial.read();
 
   if (Serial.available() >= 6)
+  // #TODO: with commas Serial.available()==12. Commas also are chars
   {
     for (uint8_t i = 0; i < 6; i++)
     {
@@ -107,6 +108,7 @@ void master_write_and_read()
   EXPECTED_RESPONSE_ID = B[0];
   while (true)
   {
+    //Read softwareserial buffer until it matches with EXPECTED_RESPONSE_ID
     while (mySerial.available())
     {
       if (mySerial.read() == EXPECTED_RESPONSE_ID)
@@ -116,31 +118,35 @@ void master_write_and_read()
       }
     }
 
+    //There are 3 frames to apply on response; Error(5), Read(7), Write(8)
     uint8_t frame_mod = 0;
     if (mySerial.available() >= 8)
-      frame_mod = 2;
+      frame_mod = 0;
     else if (mySerial.available() >= 7)
       frame_mod = 1;
     else if (mySerial.available() >= 5)
-      frame_mod = 0;
+      frame_mod = 2;
     else
       return;
 
-    const uint8_t bytes_to_read[] = {5, 7, 8};
+    //Read available bytes
+    const uint8_t bytes_to_read[] = {8, 7, 5};
     for (uint8_t i = 0, i < bytes_to_read_count[frame_mod]; i++)
       B[i] = mySerial.read();
 
-    for (uint8_t i = 0; i < (frame_mod + 1); i++)
+    //Apply frames
+    for (uint8_t i = frame_mod; i < 3; i++)
     {
       uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(bytes_to_read[i] - 2);
-      uint16_t CRC_RESPONSE_RECIEVED = ( ((uint16_t) B[bytes_to_read[i] - 1]) << 8) + (B[bytes_to_read[i] - 2]);
+      uint16_t CRC_RESPONSE_RECIEVED = (((uint16_t)B[bytes_to_read[i] - 1]) << 8) + (B[bytes_to_read[i] - 2]);,
+      //Check if received CRC is valid
       if (CRC_RESPONSE_RECIEVED == CRC_RESPONSE_EXPECTED)
       {
-        for (uint8_t j = 0; j < (bytes_to_read[i] - 1); j++)
+        for (uint8_t j = 0; j < (bytes_to_read[i]); j++)
         {
           Serial.print(String(B[j]) + ",");
         }
-        Serial.println(B[bytes_to_read[i]]);
+        Serial.println(B[bytes_to_read[i]-1]);
         return;
       }
     }
