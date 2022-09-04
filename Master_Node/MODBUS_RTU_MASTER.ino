@@ -1,157 +1,219 @@
-void master_write(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t );
-uint16_t generate_CRC_16_bit(uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t , uint8_t );
+// MAX487 pinout    ::
+// RO (PULLED_UP)   : RX_PIN
+// DI               : TX_PIN
+//~RE (PULLED_DOWN): OUT_ENABLE_PIN
+//  DE (PULLED_DOWN): OUT_ENABLE_PIN
+//  Vcc             : 5V
+//  GND             : GND
 
+void master_write(uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
+uint16_t generate_CRC_16_bit(uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
 
 #include <SoftwareSerial.h>
+
+// TODO:
 #define DEBUG true
 #define RX_PIN 2
 #define TX_PIN 3
 #define OUT_ENABLE_PIN 4
 #define SOFTWARE_SERIAL_BAUD_RATE 9600
-#define WAIT_RESPONSE_TIMEOUT_ms  1000
-#define WAIT_RESPONSE_TIME_ms  10
-SoftwareSerial mySerial(RX_PIN, TX_PIN);//Rx,Tx
+#define WAIT_RESPONSE_TIMEOUT_ms 1000
+#define WAIT_RESPONSE_TIME_ms 10
+SoftwareSerial mySerial(RX_PIN, TX_PIN); // Rx,Tx
 
-uint8_t B[8];//received bytes buffer
+uint8_t B[8]; // bytes buffer
 
-void configure_master() {
+void configure_master()
+{
   pinMode(OUT_ENABLE_PIN, OUTPUT);
   digitalWrite(OUT_ENABLE_PIN, LOW);
-  pinMode(RX_PIN, INPUT); //Probably, also, configured by SoftwareSerial library.
-  pinMode(TX_PIN, OUTPUT);//Probably, also, configured by SoftwareSerial library.
+  pinMode(RX_PIN, INPUT);  // Probably, also, configured by SoftwareSerial library.
+  pinMode(TX_PIN, OUTPUT); // Probably, also, configured by SoftwareSerial library.
   mySerial.begin(SOFTWARE_SERIAL_BAUD_RATE);
 }
 
-void master_operate() {
-  while (mySerial.available())mySerial.read();
-  if (Serial.available() >= 6) {
-    for (uint8_t i = 0; i < 6; i++)B[i] = Serial.parseInt();
-    master_write_and_read(B[0], B[1], B[2], B[3], B[4], B[5]);
-    while (Serial.available())Serial.read();
+void master_operate()
+{
+  while (mySerial.available())
+    mySerial.read();
+
+  if (Serial.available() >= 6)
+  {
+    for (uint8_t i = 0; i < 6; i++)
+    {
+      B[i] = Serial.parseInt();
+    }
+    master_write_and_read();
+    while (Serial.available())
+      Serial.read();
   }
 }
 
-//SEND AND RECEIVE DATA
-void master_write_and_read(uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
+void master_write_and_read()
+{
 
-  uint16_t CRC = generate_CRC_16_bit(6, B_0,  B_1,  B_2,  B_3,  B_4,  B_5);
-  uint8_t CRC_LEAST = CRC % 256;
-  uint8_t CRC_SIGNIFICANT = CRC >> 8;
-  if (DEBUG)Serial.println(String(CRC_LEAST) + " " + String(CRC_SIGNIFICANT));
+  uint16_t CRC = generate_CRC_16_bit(6);
+  B[6] = CRC % 256;
+  B[7] = CRC >> 8;
+
+  // Print request
+  if (DEBUG)
+  {
+    Serial.print("REQUEST: ");
+    for (uint8_t i = 0; i < 8; i++)
+    {
+      Serial.print(String(B[i] + ","))
+    }
+    Serial.println();
+  }
+
   digitalWrite(OUT_ENABLE_PIN, HIGH);
-  //WRITE QUERY | READ QUERY
-  mySerial.write(B_0);                  //ID                    |ID
-  mySerial.write(B_1);                  //FUNC CODE             |FUNC CODE
-  mySerial.write(B_2);                  //REGISTER ADDRESS (SIG)|REGISTER ADDRESS (SIG)
-  mySerial.write(B_3);                  //REGISTER ADDRESS (LST)|REGISTER ADDRESS (LST)
-  mySerial.write(B_4);                  //REGISTER VALUE (SIG)  |NUMBER OF REGISTERS (SIG)
-  mySerial.write(B_5);                  //REGISTER VALUE (LST)  |NUMBER OF REGISTERS (LST)
-  mySerial.write(CRC_LEAST);            //CRC (LST)             |CRC (LST)
-  mySerial.write(CRC_SIGNIFICANT);      //CRC (SIG)             |CRC (SIG)
+  for (uint8_t i = 0; i < 8; i++)
+  {
+    mySerial.write(B[i]);
+  }
   digitalWrite(OUT_ENABLE_PIN, LOW);
-  
-  delay(1);//datayı gönderirken RI pini LOW'a düşüyor. bu yüzden de serial data okuyor. onu temizliyor bu kod
-  while(mySerial.available())mySerial.read();//datayı gönderirken RI pini LOW'a düşüyor. bu yüzden de serial data okuyor. onu temizliyor bu kod
-  
+
   unsigned long tic = millis();
   boolean isTimedOut = true;
-  while ((millis() - tic) < WAIT_RESPONSE_TIMEOUT_ms) {
-    if (mySerial.available() > 0) {
+  while ((millis() - tic) < WAIT_RESPONSE_TIMEOUT_ms)
+  {
+    if (mySerial.available() > 0)
+    {
       isTimedOut = false;
       delay(WAIT_RESPONSE_TIME_ms);
       break;
     }
   }
-  if (DEBUG){
-    if (isTimedOut) Serial.println("!error-time out");
+
+  // Check if request is timed-out ( no response is received for a while)
+  if (DEBUG)
+  {
+    if (isTimedOut)
+      Serial.println("!error-time out");
   }
 
-
-  uint8_t number_of_bytes_received = mySerial.available();
-  if (DEBUG)Serial.println("Bytes received:" + String(number_of_bytes_received));
-
-  //for (int i = 0; i < number_of_bytes_received; i++)B[i] = Serial.println(mySerial.read());
-
-  if (number_of_bytes_received == 5) { //Exception
-
-    //ID, EXCEPTION RESPONSE FUNCTION CODE, EXCEPTION CODE, CRC (LST), CRC (SIG)
-    for (int i = 0; i < 5; i++)B[i] = mySerial.read();
-
-    uint16_t received_CRC = (((uint16_t)B[4]) << 8) + B[3];
-    uint16_t expected_CRC = generate_CRC_16_bit(3, B[0], B[1], B[2], 0, 0, 0);
-
-    if (received_CRC !=  expected_CRC ) {//CRC CHECK
-      if (DEBUG)Serial.println("!error-CRC mismatch-5 bytes");
-      //return;
-    } else if (B_0 == B[0]) {//ID check
-      Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]));
-    } else {
-      if (DEBUG)Serial.println("!error-ID mismatch-5 bytes");
-      //return;
-    }
+  if (isTimedOut)
+  {
+    return;
   }
-  else if (number_of_bytes_received == 7) { //Reply for function code 3 with single register requested
-    //0-ID, 1-FUNCTION CODE, 2-BYTE COUNT, 3-REGISTER VALUE (SIG), 4-REGISTER VALUE (LST), 5-CRC (LST), 6-CRC(SIG)
-    for (int i = 0; i < 7; i++)B[i] = mySerial.read();
 
-    uint16_t received_CRC = (((uint16_t)B[6]) << 8) + B[5];
-    uint16_t expected_CRC = generate_CRC_16_bit(5, B[0], B[1], B[2], B[3], B[4], 0);
-
-    if (received_CRC !=  expected_CRC ) {//CRC CHECK
-      if (DEBUG)Serial.println("!error-CRC mismatch-7 bytes");
-      //return;
-    } else if (B_0 == B[0]) {//ID check
-      Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]));
-    } else {
-      if (DEBUG) Serial.println("!error-ID mismatch-7 bytes");
-      //return;
-    }
+  // Print number of bytes received
+  if (DEBUG)
+  {
+    Serial.println("Bytes received:" + String(mySerial.available()));
   }
-  else if (number_of_bytes_received == 8) {//Reply for function code 6
-    //0-ID, 1-FUNCTION CODE, 2-REGISTER ADDRESS(SIG), 3-REGISTER ADDRESS (LST), 4-REGISTER VALUE (SIG), 5-REGISTER VALUE (LST), 6-CRC (LST), 7-CRC(SIG)
-    for (int i = 0; i < 8; i++)B[i] = mySerial.read();
 
-    uint16_t received_CRC = (((uint16_t)B[7]) << 8) + B[6];
-    uint16_t expected_CRC = generate_CRC_16_bit(6, B[0], B[1], B[2], B[3], B[4], B[5]);
+  EXPECTED_RESPONSE_ID = B[0];
+  while (true)
+  {
 
-    if (received_CRC !=  expected_CRC ) {//CRC CHECK
-      if (DEBUG)Serial.println("!error-CRC mismatch-8 bytes");
-      //return;
-    } else if (B_0 == B[0]) {//ID check
-      Serial.println(String(B[0]) + "," + String(B[1]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]));
-    } else {
-      if (DEBUG)Serial.println("!error-ID mismatch-8 bytes");
-      //return;
+    // error-> ID+ (2Byte) + (2Byte CRC)
+    // read -> ID+ (4Byte) + (2Byte CRC)
+    // write-> ID + (5Byte) + (2Byte CRC)
+
+    while (mySerial.available())
+    {
+      if (mySerial.read() == EXPECTED_RESPONSE_ID)
+      {
+        B[0] = EXPECTED_RESPONSE_ID;
+        break;
+      }
     }
-  } else {
-    if (DEBUG)Serial.println("!error-number of bytes received does not match");
-    //return
 
+    if (mySerial.available() >= 4)
+    {
+      for (uint8_t i = 1; i < 5; i++)
+      {
+        B[i] = mySerial.read();
+      }
+    }
+    else
+      return;
+
+    uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(3);
+    if (B[3] == (CRC_RESPONSE_EXPECTED % 256) && B[4] == (CRC_RESPONSE_EXPECTED >> 8))
+    {
+      Serial.println(String(B[0]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]));
+      return;
+    }
+
+    if (mySerial.available() >= 2)
+    {
+      for (uint8_t i = 5; i < 7; i++)
+      {
+        B[i] = mySerial.read();
+      }
+    }
+    else
+    {
+      return;
+    }
+
+    uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(5);
+    if (B[5] == (CRC_RESPONSE_EXPECTED % 256) && B[6] == (CRC_RESPONSE_EXPECTED >> 8))
+    {
+      Serial.println(String(B[0]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]));
+      return;
+    }
+
+    if (mySerial.available() >= 1)
+    {
+      for (uint8_t i = 7; i < 8; i++)
+      {
+        B[i] = mySerial.read();
+      }
+    }
+    else
+    {
+      return;
+    }
+
+    uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(6);
+    if (B[6] == (CRC_RESPONSE_EXPECTED % 256) && B[7] == (CRC_RESPONSE_EXPECTED >> 8))
+    {
+      Serial.println(String(B[0]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) + "," + String(B[7]));
+      return;
+    }
+
+    if (mySerial.available() == 0)
+    {
+
+      break;
+    }
   }
 }
 
-
-//MAGICAL CRC_16 MODBUS code.
-uint16_t generate_CRC_16_bit(uint8_t number_of_bytes, uint8_t B_0, uint8_t B_1, uint8_t B_2, uint8_t B_3, uint8_t B_4, uint8_t B_5) {
-  uint16_t remainder = CRC_16_bit_for_1BYTE(B_0, 65535);
-  if (number_of_bytes >= 2 )  remainder = CRC_16_bit_for_1BYTE(B_1, remainder);
-  if (number_of_bytes >= 3 )  remainder = CRC_16_bit_for_1BYTE(B_2, remainder);
-  if (number_of_bytes >= 4 )  remainder = CRC_16_bit_for_1BYTE(B_3, remainder);
-  if (number_of_bytes >= 5 )  remainder = CRC_16_bit_for_1BYTE(B_4, remainder);
-  if (number_of_bytes >= 6 )  remainder = CRC_16_bit_for_1BYTE(B_5, remainder);
+// MAGICAL CRC_16 MODBUS code.
+uint16_t generate_CRC_16_bit(uint8_t number_of_bytes)
+{
+  uint16_t remainder = CRC_16_bit_for_1BYTE(B[0], 65535);
+  if (number_of_bytes >= 2)
+    remainder = CRC_16_bit_for_1BYTE(B[1], remainder);
+  if (number_of_bytes >= 3)
+    remainder = CRC_16_bit_for_1BYTE(B[2], remainder);
+  if (number_of_bytes >= 4)
+    remainder = CRC_16_bit_for_1BYTE(B[3], remainder);
+  if (number_of_bytes >= 5)
+    remainder = CRC_16_bit_for_1BYTE(B[4], remainder);
+  if (number_of_bytes >= 6)
+    remainder = CRC_16_bit_for_1BYTE(B[5], remainder);
   return remainder;
-
 }
 
-uint16_t CRC_16_bit_for_1BYTE(uint16_t data, uint16_t last_data) {
-  //if this is first data (i.e LAST_DATA==null), LAST_DATA= 65535 = FFFF
-  uint16_t key = 40961; //1010 0000 0000 0001
-  data = data ^ last_data;//XOR
-  for (int i = 0; i < 8; i++) {
+uint16_t CRC_16_bit_for_1BYTE(uint16_t data, uint16_t last_data)
+{
+  // if this is first data (i.e LAST_DATA==null), LAST_DATA= 65535 = FFFF
+  uint16_t key = 40961;    // 1010 0000 0000 0001
+  data = data ^ last_data; // XOR
+  for (int i = 0; i < 8; i++)
+  {
     boolean should_XOR = false;
-    if (data % 2 == 1)should_XOR = true;
+    if (data % 2 == 1)
+      should_XOR = true;
     data = data >> 1;
-    if (should_XOR)data = data ^ key;
+    if (should_XOR)
+      data = data ^ key;
   }
   return data;
 }
