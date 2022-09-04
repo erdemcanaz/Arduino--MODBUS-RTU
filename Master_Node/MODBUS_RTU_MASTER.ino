@@ -107,11 +107,6 @@ void master_write_and_read()
   EXPECTED_RESPONSE_ID = B[0];
   while (true)
   {
-
-    // error-> ID+ (2Byte) + (2Byte CRC)
-    // read -> ID+ (4Byte) + (2Byte CRC)
-    // write-> ID + (5Byte) + (2Byte CRC)
-
     while (mySerial.available())
     {
       if (mySerial.read() == EXPECTED_RESPONSE_ID)
@@ -121,65 +116,33 @@ void master_write_and_read()
       }
     }
 
-    if (mySerial.available() >= 4)
-    {
-      for (uint8_t i = 1; i < 5; i++)
-      {
-        B[i] = mySerial.read();
-      }
-    }
+    uint8_t frame_mod = 0;
+    if (mySerial.available() >= 8)
+      frame_mod = 2;
+    else if (mySerial.available() >= 7)
+      frame_mod = 1;
+    else if (mySerial.available() >= 5)
+      frame_mod = 0;
     else
       return;
 
-    uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(3);
-    if (B[3] == (CRC_RESPONSE_EXPECTED % 256) && B[4] == (CRC_RESPONSE_EXPECTED >> 8))
-    {
-      Serial.println(String(B[0]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]));
-      return;
-    }
+    const uint8_t bytes_to_read[] = {5, 7, 8};
+    for (uint8_t i = 0, i < bytes_to_read_count[frame_mod]; i++)
+      B[i] = mySerial.read();
 
-    if (mySerial.available() >= 2)
+    for (uint8_t i = 0; i < (frame_mod + 1); i++)
     {
-      for (uint8_t i = 5; i < 7; i++)
+      uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(bytes_to_read[i] - 2);
+      uint16_t CRC_RESPONSE_RECIEVED = ( ((uint16_t) B[bytes_to_read[i] - 1]) << 8) + (B[bytes_to_read[i] - 2]);
+      if (CRC_RESPONSE_RECIEVED == CRC_RESPONSE_EXPECTED)
       {
-        B[i] = mySerial.read();
+        for (uint8_t j = 0; j < (bytes_to_read[i] - 1); j++)
+        {
+          Serial.print(String(B[j]) + ",");
+        }
+        Serial.println(B[bytes_to_read[i]]);
+        return;
       }
-    }
-    else
-    {
-      return;
-    }
-
-    uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(5);
-    if (B[5] == (CRC_RESPONSE_EXPECTED % 256) && B[6] == (CRC_RESPONSE_EXPECTED >> 8))
-    {
-      Serial.println(String(B[0]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]));
-      return;
-    }
-
-    if (mySerial.available() >= 1)
-    {
-      for (uint8_t i = 7; i < 8; i++)
-      {
-        B[i] = mySerial.read();
-      }
-    }
-    else
-    {
-      return;
-    }
-
-    uint16_t CRC_RESPONSE_EXPECTED = generate_CRC_16_bit(6);
-    if (B[6] == (CRC_RESPONSE_EXPECTED % 256) && B[7] == (CRC_RESPONSE_EXPECTED >> 8))
-    {
-      Serial.println(String(B[0]) + "," + String(B[2]) + "," + String(B[3]) + "," + String(B[4]) + "," + String(B[5]) + "," + String(B[6]) + "," + String(B[7]));
-      return;
-    }
-
-    if (mySerial.available() == 0)
-    {
-
-      break;
     }
   }
 }
